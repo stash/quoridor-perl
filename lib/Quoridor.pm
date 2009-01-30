@@ -43,9 +43,15 @@ Cells are where player pawns are placed.
 =cut
 
 field 'active_player' => 'A';
+field 'players' => {};
 
 use constant U => 0;
 use constant V => 1;
+
+our %Starting_Coords = (
+    A => [4,0],
+    B => [4,8],
+);
 
 sub new {
     my $self = bless {},__PACKAGE__;
@@ -57,8 +63,11 @@ sub new {
     }
     $self->{walls}[8] = [(undef) x 9];
 
-    $self->{player}{A} = {coord => [4,0], walls => 10 };
-    $self->{player}{B} = {coord => [4,8], walls => 10 };
+    while (my ($label, $coords) = each %Starting_Coords) {
+        my $player = Quoridor::Player->new($label);
+        $player->pos([@$coords]);
+        $self->players->{$label} = $player;
+    }
 
     return $self;
 }
@@ -79,10 +88,15 @@ sub next_player {
     return $self->active_player;
 }
 
+sub cur_player {
+    my $self = shift;
+    return $self->players->{$self->active_player};
+}
+
 sub player_at {
-    my ($self, $player) = @_;
-    $player ||= $self->active_player;
-    return @{$self->{player}{$player}{coord}}
+    my ($self, $label) = @_;
+    $label ||= $self->active_player;
+    return $self->players->{$label}->pos;
 }
 
 sub wall {
@@ -112,12 +126,19 @@ sub place_wall {
         die "wall overlaps" if ($up or $down);
     }
 
+    # TODO
+#     unless ($UNLIMITED_WALLS) {
+#         my $cur = $self->cur_player->walls;
+#         die "no more walls" unless $cur;
+#         $self->cur_player->walls($cur - 1);
+#     }
+
     $self->{walls}[$y][$x] = $dir;
 }
 
 sub _place_player {
     my ($self, $u, $v) = @_;
-    $self->{player}{$self->active_player}{coord} = [$u,$v];
+    $self->cur_player->pos($u,$v);
 }
 
 sub _move_uv {
@@ -136,16 +157,57 @@ sub _move_uv {
 
 sub move_player {
     my ($self, $move) = @_;
-    my $cur_uv = $self->{player}{$self->active_player}{coord};
+    my ($u,$v) = $self->cur_player->pos;
 
     my ($d_u,$d_v) = _move_uv($move);
-    my @new_uv = ($cur_uv->[U] + $d_u, $cur_uv->[V] + $d_v);
+    $u += $d_u;
+    $v += $d_v;
 
-    if ($new_uv[U] < 0 || $new_uv[U] > 8 ||
-        $new_uv[V] < 0 || $new_uv[V] > 8)
+    if ($u < 0 || $u > 8 ||
+        $v < 0 || $v > 8)
     {
         die "cannot move $move; edge of board";
     }
+
+    $self->cur_player->pos($u,$v);
+}
+
+package Quoridor::Player;
+use warnings;
+use strict;
+
+use Class::Field qw/field/;
+
+field 'label';
+field 'walls' => 10;
+
+use constant U => 0;
+use constant V => 1;
+
+sub new {
+    my $class = shift;
+    my $label = shift;
+
+    my $self = bless {}, $class;
+
+    $self->label($label);
+    $self->{pos} = [];
+    return $self;
+}
+
+sub pos {
+    my $self = shift;
+    if (@_) {
+        if (ref($_[0]) eq 'ARRAY') {
+            my $pos = shift;
+            $self->{pos} = [@$pos[U,V]];
+        }
+        else {
+            $self->{pos} = [@_[U,V]];
+        }
+    }
+
+    return @{$self->{pos}};
 }
 
 1;
