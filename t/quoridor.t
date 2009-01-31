@@ -1,13 +1,15 @@
 #!perl
-use Test::More tests => 62;
+use Test::More tests => 65;
 use warnings FATAL => 'all';
 use strict;
 
 use_ok 'Quoridor';
 
+local $Quoridor::UNLIMITED_WALLS = 1;
+
 basic: {
-my $q = Quoridor->new();
-isa_ok $q, 'Quoridor';
+    my $q = Quoridor->new();
+    isa_ok $q, 'Quoridor';
 }
 
 set_player: {
@@ -107,6 +109,20 @@ overlapping: {
         eval { $q->place_wall(col => 5,6) };
         like $@, qr/wall overlaps/;
     }
+}
+
+run_out_of_walls: {
+    local $Quoridor::UNLIMITED_WALLS = 0;
+    my $q = Quoridor->new();
+    is $q->cur_player->walls, 10, 'starts out with the right #';
+
+    $q->cur_player->walls(1);
+
+    $q->place_wall(row => 1,1);
+    is $q->cur_player->walls, 0, 'no walls left';
+
+    eval { $q->place_wall(row => 2,2) };
+    ok $@;
 }
 
 player_pos: {

@@ -53,6 +53,8 @@ our %Starting_Coords = (
     B => [4,8],
 );
 
+our $UNLIMITED_WALLS = 0;
+
 sub new {
     my $self = bless {},__PACKAGE__;
 
@@ -126,12 +128,11 @@ sub place_wall {
         die "wall overlaps" if ($up or $down);
     }
 
-    # TODO
-#     unless ($UNLIMITED_WALLS) {
-#         my $cur = $self->cur_player->walls;
-#         die "no more walls" unless $cur;
-#         $self->cur_player->walls($cur - 1);
-#     }
+    unless ($UNLIMITED_WALLS) {
+        my $cur = $self->cur_player->walls;
+        die "no more walls" unless $cur;
+        $self->cur_player->walls($cur - 1);
+    }
 
     $self->{walls}[$y][$x] = $dir;
 }
@@ -157,8 +158,8 @@ sub _move_uv {
 
 sub move_player {
     my ($self, $move) = @_;
-    my ($u,$v) = $self->cur_player->pos;
 
+    my ($u,$v) = $self->cur_player->pos;
     my ($d_u,$d_v) = _move_uv($move);
     $u += $d_u;
     $v += $d_v;
