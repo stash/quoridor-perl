@@ -1,5 +1,5 @@
 #!perl
-use Test::More tests => 65;
+use Test::More tests => 69;
 use warnings FATAL => 'all';
 use strict;
 
@@ -139,30 +139,41 @@ player_pos: {
 player_move: {
     my $q = Quoridor->new();
 
-    edge: {
-        $q->_place_player(0,0);
-        is_deeply [$q->player_at], [0,0];
+    $q->_place_player(0,0);
+    is_deeply [$q->player_at], [0,0];
 
-        eval { $q->move_player('up'); };
-        like $@, qr/cannot move up; edge of board/;
-        is_deeply [$q->player_at], [0,0];
+    eval { $q->move_player('up'); };
+    like $@, qr/cannot move up; edge of board/;
+    is_deeply [$q->player_at], [0,0];
 
-        eval { $q->move_player('left'); };
-        like $@, qr/cannot move left; edge of board/;
-        is_deeply [$q->player_at], [0,0];
+    eval { $q->move_player('left'); };
+    like $@, qr/cannot move left; edge of board/;
+    is_deeply [$q->player_at], [0,0];
+
+    $q->move_player('down');
+    is_deeply [$q->player_at], [0,1];
+
+    $q->move_player('right');
+    is_deeply [$q->player_at], [1,1];
 
 
-        $q->_place_player(8,8);
-        is_deeply [$q->player_at], [8,8];
+    $q->_place_player(8,8);
+    is_deeply [$q->player_at], [8,8];
 
-        eval { $q->move_player('down'); };
-        like $@, qr/cannot move down; edge of board/;
-        is_deeply [$q->player_at], [8,8];
+    eval { $q->move_player('down'); };
+    like $@, qr/cannot move down; edge of board/;
+    is_deeply [$q->player_at], [8,8];
 
-        eval { $q->move_player('right'); };
-        like $@, qr/cannot move right; edge of board/;
-        is_deeply [$q->player_at], [8,8];
-    }
+    eval { $q->move_player('right'); };
+    like $@, qr/cannot move right; edge of board/;
+    is_deeply [$q->player_at], [8,8];
+
+    $q->move_player('up');
+    is_deeply [$q->player_at], [8,7];
+
+    $q->move_player('left');
+    is_deeply [$q->player_at], [7,7];
+}
 
 =pod
 
@@ -185,8 +196,6 @@ player_move: {
     is_deeply [$q->player_at], [5,8];
 
 =cut
-
-}
 
 # TODO: illegal to cut off player from destination
 # TODO: jumping pawns
