@@ -44,6 +44,11 @@ field 'players' => {};
 use constant U => 0;
 use constant V => 1;
 
+use constant MAX_UV => 8;
+use constant NUM_UV => 9;
+use constant MAX_XY => 9;
+use constant NUM_XY => 10;
+
 our %Starting_Coords = (
     A => [4,0],
     B => [4,8],
@@ -54,12 +59,11 @@ our $UNLIMITED_WALLS = 0;
 sub new {
     my $self = bless {},__PACKAGE__;
 
-    $self->{walls} = [];
-    $self->{walls}[0] = [(undef) x 9];
-    for my $y (1 .. 7) {
-        $self->{walls}[$y] = [undef, (0) x 7, undef];
+    my @walls;
+    for my $y (0 .. MAX_XY) {
+        $walls[$y] = [('') x NUM_XY];
     }
-    $self->{walls}[8] = [(undef) x 9];
+    $self->{walls} = \@walls;
 
     while (my ($label, $coords) = each %Starting_Coords) {
         my $player = Quoridor::Player->new($label);
@@ -140,15 +144,14 @@ sub _place_player {
 
 sub _move_uv {
     my $move = shift;
-    my ($d_u, $d_v) = (0,0);
+    my ($d_u,$d_v) = (0,0);
 
-    if ($move eq 'up')       { $d_v--; }
+    if    ($move eq 'up')    { $d_v--; }
     elsif ($move eq 'down')  { $d_v++; }
     elsif ($move eq 'left')  { $d_u--; }
     elsif ($move eq 'right') { $d_u++; }
-    else {
-        die "illegal move";
-    }
+    else { die "illegal move"; }
+
     return ($d_u,$d_v);
 }
 
@@ -157,16 +160,38 @@ sub move_player {
 
     my ($u,$v) = $self->cur_player->pos;
     my ($d_u,$d_v) = _move_uv($move);
-    $u += $d_u;
-    $v += $d_v;
+    my $new_u = $u + $d_u;
+    my $new_v = $v + $d_v;
 
-    if ($u < 0 || $u > 8 ||
-        $v < 0 || $v > 8)
-    {
+    if ($new_u < 0 || $new_u > 8 || $new_v < 0 || $new_v > 8) {
         die "cannot move $move; edge of board";
     }
 
-    $self->cur_player->pos($u,$v);
+    my $wall_ul = $self->{walls}[$v  ][$u  ];
+    my $wall_ur = $self->{walls}[$v  ][$u+1];
+    my $wall_dl = $self->{walls}[$v+1][$u  ];
+    my $wall_dr = $self->{walls}[$v+1][$u+1];
+
+    if (
+        ($d_v < 0 && ($wall_ul eq 'row' || $wall_ur eq 'row')) ||
+        ($d_v > 0 && ($wall_dl eq 'row' || $wall_dr eq 'row')) ||
+        ($d_u < 0 && ($wall_ul eq 'col' || $wall_dl eq 'col')) ||
+        ($d_u > 0 && ($wall_ur eq 'col' || $wall_dr eq 'col'))
+    ) {
+        die "cannot move $move; wall";
+    }
+
+    $self->cur_player->pos($new_u,$new_v);
+}
+
+sub _dump_walls {
+    my $self = shift;
+    for my $y (0 .. MAX_XY) {
+        for my $x (0 .. MAX_XY) {
+            printf '[%3s]',$self->{walls}[$y][$x];
+        }
+        print "\n";
+    }
 }
 
 package Quoridor::Player;

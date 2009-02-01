@@ -1,5 +1,5 @@
 #!perl
-use Test::More tests => 69;
+use Test::More tests => 80;
 use warnings FATAL => 'all';
 use strict;
 
@@ -130,7 +130,7 @@ player_pos: {
 
     start: {
         is $q->active_player, 'A';
-        is_deeply [$q->player_at], [4,0];
+        is_player_at($q => 4,0);
         is_deeply [$q->player_at('A')], [4,0];
         is_deeply [$q->player_at('B')], [4,8];
     }
@@ -140,67 +140,90 @@ player_move: {
     my $q = Quoridor->new();
 
     $q->_place_player(0,0);
-    is_deeply [$q->player_at], [0,0];
+    is_player_at($q => 0,0);
 
     eval { $q->move_player('up'); };
     like $@, qr/cannot move up; edge of board/;
-    is_deeply [$q->player_at], [0,0];
+    is_player_at($q => 0,0);
 
     eval { $q->move_player('left'); };
     like $@, qr/cannot move left; edge of board/;
-    is_deeply [$q->player_at], [0,0];
+    is_player_at($q => 0,0);
 
     $q->move_player('down');
-    is_deeply [$q->player_at], [0,1];
+    is_player_at($q => 0,1);
 
     $q->move_player('right');
-    is_deeply [$q->player_at], [1,1];
+    is_player_at($q => 1,1);
 
 
     $q->_place_player(8,8);
-    is_deeply [$q->player_at], [8,8];
+    is_player_at($q => 8,8);
 
     eval { $q->move_player('down'); };
     like $@, qr/cannot move down; edge of board/;
-    is_deeply [$q->player_at], [8,8];
+    is_player_at($q => 8,8);
 
     eval { $q->move_player('right'); };
     like $@, qr/cannot move right; edge of board/;
-    is_deeply [$q->player_at], [8,8];
+    is_player_at($q => 8,8);
 
     $q->move_player('up');
-    is_deeply [$q->player_at], [8,7];
+    is_player_at($q => 8,7);
 
     $q->move_player('left');
-    is_deeply [$q->player_at], [7,7];
+    is_player_at($q => 7,7);
 }
 
-=pod
-
+walls_block_movement: {
+    my $q = Quoridor->new();
     $q->place_wall(row => 4,8);
+    $q->next_player();
+    is_player_at($q => 4,8);
 
-    $q->next_player;
-
-    eval { $q->move_player('down'); };
+    eval { $q->move_player('down') };
     like $@, qr/cannot move down; edge of board/;
+    is_player_at($q => 4,8);
 
-    eval { $q->move_player('up'); };
-    like $@, qr/cannot move down; wall in the way/;
+    eval { $q->move_player('up') };
+    like $@, qr/cannot move up; wall/;
+    is_player_at($q => 4,8);
 
-    is_deeply [$q->player_at], [4,8];
-    $q->move_player('left');
-    is_deeply [$q->player_at], [3,8];
-    $q->move_player('right');
-    is_deeply [$q->player_at], [4,8];
-    $q->move_player('right');
-    is_deeply [$q->player_at], [5,8];
 
-=cut
+    $q->_place_player(4,7);
+
+    eval { $q->move_player('down') };
+    like $@, qr/cannot move down; wall/;
+    is_player_at($q => 4,7);
+
+
+    $q->place_wall(col => 4,5);
+    $q->next_player();
+
+    $q->_place_player(4,4);
+    eval { $q->move_player('left') };
+    like $@, qr/cannot move left; wall/;
+    is_player_at($q => 4,4);
+
+    $q->_place_player(3,4);
+    eval { $q->move_player('right') };
+    like $@, qr/cannot move right; wall/;
+    is_player_at($q => 3,4);
+}
 
 # TODO: illegal to cut off player from destination
 # TODO: jumping pawns
 # TODO: jumping pawns, but blocked by wall
 
 ok 1, 'done';
+
+sub is_player_at {
+    my ($q, $u, $v) = @_;
+    local $Test::Builder::Level = $Test::Builder::Level + 1;
+
+    my ($player_u, $player_v) = $q->player_at();
+    ok($u == $player_u && $v == $player_v)
+        or diag("    Player at ($player_u,$player_v) instead of ($u,$v)");
+}
 
 exit;
