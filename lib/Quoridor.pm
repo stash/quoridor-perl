@@ -6,39 +6,35 @@ use Class::Field qw/field/;
 
 =head2 Coordinates
 
-=head3 Wall Coordinates
+The x/y coordinate system denotes the points (between which walls can be
+placed)
 
-Each point will have either a "row" or "column" wall placed there.
+The u/v coordinate system is for addressing cells (where pawns can be
+placed).
 
-      y=0 --> +-+-+-+-+-+-+-+-+-+
-              |                 |
-      y=1 --> + + + + + + + + + +
-          x=1 --^             ^-- x=8
-      y=2 --> + + + + + + + + + +
-              |                 |
-    ...
-      y=8 --> + + + + + + + + + +
-              |                 |
-      y=9 --> +-+-+-+-+-+-+-+-+-+
+A,B,C,D are the starting positions
 
-
-=head3 Cell Coordinates
-
-Cells are where player pawns are placed.
-
-              +-+-+-+-+-+-+-+-+-+
-      v=0 --> |                 |
-              + + + + + + + + + +
-      v=1 --> |                 |
-              + + + + + + + + + +
-         u=0 --^              |^-- u=8
-              +-+-+-+-+-+-+-+-+-+
-      ...
-              +-+-+-+-+-+-+-+-+-+
-      v=7 --> |                 |
-              + + + + + + + + + +
-      v=8 --> |                 |
-              + + + + + + + + + +
+    x=0 x=1   2   3   4   5   6   7   8   9
+  y=0 +---+---+---+---+---+---+---+---+---+
+      |                 A                 | 0=v
+  y=1 +   +   +   +   +   +   +   +   +   +
+      |                                   | 1=v
+    2 +   +   +   +   +   +   +   +   +   +
+      |                                   | 2
+    3 +   +   +   +   +   +   +   +   +   +
+      |                                   | 3
+    4 +   +   +   +   +   +   +   +   +   +
+      | C                               D | 4
+    5 +   +   +   +   +   +   +   +   +   +
+      |                                   | 5
+    6 +   +   +   +   +   +   +   +   +   +
+      |                                   | 6
+    7 +   +   +   +   +   +   +   +   +   +
+      |                                   | 7
+    8 +   +   +   +   +   +   +   +   +   +
+      |                 B                 | 8
+    9 +---+---+---+---+---+---+---+---+---+
+      u=0 u=1   2   3   4   5   6   7   8
 
 =cut
 
