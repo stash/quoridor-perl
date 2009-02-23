@@ -2,6 +2,7 @@ package Quoridor;
 use Moose;
 use Moose::Util::TypeConstraints;
 use MooseX::AttributeHelpers;
+use Carp qw/carp croak/;
 
 =head2 Coordinates
 
@@ -128,7 +129,7 @@ sub wall {
     my $self = shift;
     my $p = shift;
     my ($x, $y) = ref($p) ? (@$p) : ($p, shift);
-    die "coordinate out of bounds\n"
+    croak "coordinate out of bounds\n"
         if ($x < 0 || $x > 8 || $y < 0 || $y > 8);
     return $self->_wall($x,$y);
 }
@@ -151,21 +152,21 @@ sub place_wall {
     my $p = shift;
     my ($x, $y) = ref($p) ? (@$p) : ($p, shift);
 
-    die "can't place wall on edge of board\n"
+    croak "can't place wall on edge of board\n"
         if ($x == 0 || $x == 9 || $y == 0 || $y == 9);
 
     my $wall = $self->wall($x,$y);
-    die "already a ".$wall->dir." wall at ($x,$y)\n" if $wall;
+    croak "already a ".$wall->dir." wall at ($x,$y)\n" if $wall;
 
     if ($dir eq 'row') {
         my $left  = $self->_wall($x-1,$y);
         my $right = $self->_wall($x+1,$y);
-        die "wall overlaps" if ($left or $right);
+        croak "wall overlaps" if ($left or $right);
     }
     else {
         my $up   = $self->_wall($x,$y-1);
         my $down = $self->_wall($x,$y+1);
-        die "wall overlaps" if ($up or $down);
+        croak "wall overlaps" if ($up or $down);
     }
 
     $wall = Quoridor::Wall->new(
@@ -176,7 +177,7 @@ sub place_wall {
 
     unless ($UNLIMITED_WALLS) {
         my $cur = $self->player->walls_remaining;
-        die "no more walls" unless $cur;
+        croak "no more walls" unless $cur;
         $self->player->dec_walls;
     }
 
@@ -198,7 +199,7 @@ sub _move_uv {
     elsif ($move eq 'down')  { $d_v++; }
     elsif ($move eq 'left')  { $d_u--; }
     elsif ($move eq 'right') { $d_u++; }
-    else { die "illegal move"; }
+    else { croak "illegal move"; }
 
     return ($d_u,$d_v);
 }
@@ -212,7 +213,7 @@ sub move_player {
     my ($new_u,$new_v) = ($u+$d_u, $v+$d_v);
 
     if ($new_u < 0 || $new_u > 8 || $new_v < 0 || $new_v > 8) {
-        die "cannot move $move; edge of board";
+        croak "cannot move $move; edge of board";
     }
 
     my $wall_ul = $self->_wall_dir($u  ,$v  );
@@ -226,7 +227,7 @@ sub move_player {
         ($d_u < 0 && ($wall_ul eq 'col' || $wall_dl eq 'col')) ||
         ($d_u > 0 && ($wall_ur eq 'col' || $wall_dr eq 'col'))
     ) {
-        die "cannot move $move; wall";
+        croak "cannot move $move; wall";
     }
 
     $self->player->loc([$new_u,$new_v]);
