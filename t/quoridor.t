@@ -1,5 +1,6 @@
 #!perl
-use Test::More tests => 80;
+use Test::More tests => 103;
+use Test::Exception;
 use warnings FATAL => 'all';
 use strict;
 
@@ -12,18 +13,21 @@ basic: {
     isa_ok $q, 'Quoridor';
 }
 
-set_player: {
-    my $q = Quoridor->new();
-    is $q->active_player, 'A';
-    my $next = $q->next_player();
-    is $next, 'B';
-    is $q->active_player, 'B';
-    $next = $q->next_player();
-    is $next, 'A';
-    is $q->active_player, 'A';
-    $next = $q->next_player();
-    is $next, 'B';
-    is $q->active_player, 'B';
+
+wall_create: {
+    my $wall = Quoridor::Wall->new(
+        loc => [1,2],
+        dir => 'row',
+    );
+    isa_ok $wall, 'Quoridor::Wall';
+    is $wall->placed_by, undef;
+
+    dies_ok {
+        Quoridor::Wall->new(
+            loc => [1,2],
+            dir => 'blarf',
+        );
+    };
 }
 
 wall: {
@@ -32,11 +36,11 @@ wall: {
     oob: {
         for my $set (
             [-1,-1], [9,9],
-            [-100,0],[0,-100],
-            [100,0],[0,100],
+            [-100,0], [0,-100],
+            [ 100,0], [0, 100],
         ) {
             $@ = undef;
-            eval { $q->wall(@$set) };
+            eval { $q->wall($set) };
             like $@, qr/out of bounds/, join(',','oob',@$set);
         }
 
@@ -49,15 +53,23 @@ wall: {
         }
     }
 
-    ok !$q->wall(1,1);
-    eval { $q->place_wall(row => 1,1) };
-    ok !$@;
-    is $q->wall(1,1), 'row';
+    place_row: {
+        my $wall = $q->wall(1,1);
+        ok !$wall;
+        lives_ok { $q->place_wall(row => 1,1) };
+        $wall = $q->wall(1,1);
+        ok $wall;
+        is $wall->dir, 'row';
+    }
 
-    ok !$q->wall(7,7);
-    eval { $q->place_wall(col => 7,7) };
-    ok !$@;
-    is $q->wall(7,7), 'col';
+    place_col: {
+        my $wall = $q->wall(7,7);
+        ok !$wall;
+        lives_ok { $q->place_wall(col => 7,7) };
+        $wall = $q->wall(7,7);
+        ok $wall;
+        is $wall->dir, 'col';
+    }
 
     edge: {
         for my $set (
@@ -80,21 +92,31 @@ overlapping: {
 
     cross: {
         $q->place_wall(row => 1,5);
-        is $q->wall(1,5), 'row';
+        isa_ok $q->wall(1,5), 'Quoridor::Wall';
+        is $q->wall(1,5)->dir, 'row';
 
         eval { $q->place_wall(col => 1,5) };
         like $@, qr/already a row wall at \(1,5\)/;
 
         $q->place_wall(col => 7,1);
-        is $q->wall(7,1), 'col';
+        isa_ok $q->wall(7,1), 'Quoridor::Wall';
+        is $q->wall(7,1)->dir, 'col';
 
         eval { $q->place_wall(row => 7,1) };
         like $@, qr/already a col wall at \(7,1\)/;
+        eval { $q->place_wall(col => 7,1) };
+        like $@, qr/already a col wall at \(7,1\)/;
+
+        eval { $q->place_wall(row => 1,5) };
+        like $@, qr/already a row wall at \(1,5\)/;
+        eval { $q->place_wall(col => 1,5) };
+        like $@, qr/already a row wall at \(1,5\)/;
     }
 
     common: {
         $q->place_wall(row => 3,3);
-        is $q->wall(3,3), 'row';
+        isa_ok $q->wall(3,3), 'Quoridor::Wall';
+        is $q->wall(3,3)->dir, 'row';
 
         eval { $q->place_wall(row => 2,3) };
         like $@, qr/wall overlaps/;
@@ -102,7 +124,8 @@ overlapping: {
         like $@, qr/wall overlaps/;
 
         $q->place_wall(col => 5,5);
-        is $q->wall(5,5), 'col';
+        isa_ok $q->wall(5,5), 'Quoridor::Wall';
+        is $q->wall(5,5)->dir, 'col';
 
         eval { $q->place_wall(col => 5,4) };
         like $@, qr/wall overlaps/;
@@ -114,26 +137,57 @@ overlapping: {
 run_out_of_walls: {
     local $Quoridor::UNLIMITED_WALLS = 0;
     my $q = Quoridor->new();
-    is $q->cur_player->walls, 10, 'starts out with the right #';
+    is $q->player->walls_remaining, 10, 'starts out with the right #';
 
-    $q->cur_player->walls(1);
+    $q->player->dec_walls for (1..9);
 
     $q->place_wall(row => 1,1);
-    is $q->cur_player->walls, 0, 'no walls left';
+    is $q->player->walls_remaining, 0, 'no walls left';
 
     eval { $q->place_wall(row => 2,2) };
     ok $@;
 }
 
-player_pos: {
+setup_players: {
     my $q = Quoridor->new();
 
-    start: {
-        is $q->active_player, 'A';
-        is_player_at($q => 4,0);
-        is_deeply [$q->player_at('A')], [4,0];
-        is_deeply [$q->player_at('B')], [4,8];
-    }
+    my $players = $q->players;
+    my ($a, $b, $c) = @$players;
+    isa_ok $a, 'Quoridor::Player';
+    isa_ok $b, 'Quoridor::Player';
+    is $c, undef, 'just two players';
+
+    is $a->name, 'Player A';
+    is $a->symbol, 'A';
+    is_deeply $a->loc, [4,0];
+
+    is $b->name, 'Player B';
+    is $b->symbol, 'B';
+    is_deeply $b->loc, [4,8];
+
+    my $active = $q->player;
+    isa_ok $active, 'Quoridor::Player';
+    is $active, $a;
+    is $active->name, 'Player A';
+    is_player_at($q => 4,0);
+}
+
+next_player: {
+    my $q = Quoridor->new();
+
+    isa_ok $q->player, 'Quoridor::Player';
+    is $q->player->name, 'Player A';
+
+    my $next = $q->next_player;
+    isa_ok $next, 'Quoridor::Player';
+    is $next, $q->player;
+    is $next->name, 'Player B';
+
+    is $q->next_player->name, 'Player A';
+    is $q->player->name, 'Player A';
+
+    is $q->next_player->name, 'Player B';
+    is $q->player->name, 'Player B';
 }
 
 player_move: {
@@ -221,7 +275,9 @@ sub is_player_at {
     my ($q, $u, $v) = @_;
     local $Test::Builder::Level = $Test::Builder::Level + 1;
 
-    my ($player_u, $player_v) = $q->player_at();
+    my $p = $q->player->loc;
+    my ($player_u, $player_v) = @$p;
+
     ok($u == $player_u && $v == $player_v)
         or diag("    Player at ($player_u,$player_v) instead of ($u,$v)");
 }

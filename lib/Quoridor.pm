@@ -1,8 +1,5 @@
 package Quoridor;
-use warnings;
-use strict;
-
-use Class::Field qw/field/;
+use Moose;
 
 =head2 Coordinates
 
@@ -38,11 +35,10 @@ A,B,C,D are the starting positions
 
 =cut
 
-field 'active_player' => 'A';
-field 'players' => {};
-
 use constant U => 0;
 use constant V => 1;
+use constant X => 0;
+use constant Y => 1;
 
 use constant MAX_UV => 8;
 use constant NUM_UV => 9;
@@ -53,93 +49,119 @@ our %Starting_Coords = (
     A => [4,0],
     B => [4,8],
 );
-
 our $UNLIMITED_WALLS = 0;
 
-sub new {
-    my $self = bless {},__PACKAGE__;
+has players => (
+    is => 'ro', lazy => 1, init_arg => undef,
+    isa => 'ArrayRef[Quoridor::Player]',
+    builder => '_build_players',
+);
 
+has walls => (
+    is => 'ro', lazy => 1, init_arg => undef,
+    isa => 'ArrayRef[ArrayRef[Undef|Quoridor::Wall]]', # 2D array of Walls
+    builder => '_build_walls'
+);
+
+sub _build_players {
+    my $self = shift;
+    my @players;
+
+    my @symbols = sort keys %Starting_Coords;
+    foreach my $symbol (@symbols) {
+        my $coords = $Starting_Coords{$symbol};
+        my $player = Quoridor::Player->new(
+            name => "Player $symbol",
+            symbol => $symbol,
+            walls => 10,
+            loc => [@$coords],
+        );
+        push @players, $player;
+    }
+
+    return \@players;
+}
+
+sub _build_walls {
     my @walls;
     for my $y (0 .. MAX_XY) {
-        $walls[$y] = [('') x NUM_XY];
+        $walls[$y] = [(undef) x NUM_XY];
     }
-    $self->{walls} = \@walls;
-
-    while (my ($label, $coords) = each %Starting_Coords) {
-        my $player = Quoridor::Player->new($label);
-        $player->pos([@$coords]);
-        $self->players->{$label} = $player;
-    }
-
-    return $self;
+    return \@walls;
 }
+
+sub player { return $_[0]->players->[0]; }
 
 sub next_player {
     my $self = shift;
-    my $active = $self->active_player();
-    if (!$active) {
-        $self->active_player('A');
-    }
-    elsif ($active eq 'A') {
-        $self->active_player('B');
-    }
-    else {
-        $self->active_player('A');
-    }
-
-    return $self->active_player;
-}
-
-sub cur_player {
-    my $self = shift;
-    return $self->players->{$self->active_player};
-}
-
-sub player_at {
-    my ($self, $label) = @_;
-    $label ||= $self->active_player;
-    return $self->players->{$label}->pos;
+    my $p = $self->players;
+    push @$p, shift @$p;
+    return $self->player;
 }
 
 sub wall {
-    my ($self, $x,$y) = @_;
+    my $self = shift;
+    my $p = shift;
+    my ($x, $y) = ref($p) ? (@$p) : ($p, shift);
     die "coordinate out of bounds\n"
         if ($x < 0 || $x > 8 || $y < 0 || $y > 8);
-    return $self->{walls}[$y][$x];
+    return $self->_wall($x,$y);
+}
+
+sub _wall {
+    my $self = shift;
+    return $self->walls->[$_[Y]][$_[X]];
+}
+
+sub _wall_dir {
+    my $self = shift;
+    my $wall = $self->walls->[$_[Y]][$_[X]];
+    return '' unless $wall;
+    return $wall->dir;
 }
 
 sub place_wall {
-    my ($self, $dir, $x,$y) = @_;
+    my $self = shift;
+    my $dir = shift;
+    my $p = shift;
+    my ($x, $y) = ref($p) ? (@$p) : ($p, shift);
 
     die "can't place wall on edge of board\n"
         if ($x == 0 || $x == 9 || $y == 0 || $y == 9);
 
     my $wall = $self->wall($x,$y);
-    die "already a $wall wall at ($x,$y)\n" if $wall;
+    die "already a ".$wall->dir." wall at ($x,$y)\n" if $wall;
 
     if ($dir eq 'row') {
-        my $left = $self->{walls}[$y][$x-1];
-        my $right = $self->{walls}[$y][$x+1];
+        my $left  = $self->_wall($x-1,$y);
+        my $right = $self->_wall($x+1,$y);
         die "wall overlaps" if ($left or $right);
     }
     else {
-        my $up = $self->{walls}[$y-1][$x];
-        my $down = $self->{walls}[$y+1][$x];
+        my $up   = $self->_wall($x,$y-1);
+        my $down = $self->_wall($x,$y+1);
         die "wall overlaps" if ($up or $down);
     }
 
+    $wall = Quoridor::Wall->new(
+        dir => $dir,
+        loc => [$x,$y],
+        placed_by => $self->player,
+    );
+
     unless ($UNLIMITED_WALLS) {
-        my $cur = $self->cur_player->walls;
+        my $cur = $self->player->walls_remaining;
         die "no more walls" unless $cur;
-        $self->cur_player->walls($cur - 1);
+        $self->player->dec_walls;
     }
 
-    $self->{walls}[$y][$x] = $dir;
+    $self->walls->[$y][$x] = $wall;
+    return $wall;
 }
 
 sub _place_player {
     my ($self, $u, $v) = @_;
-    $self->cur_player->pos($u,$v);
+    $self->player->loc([$u,$v]);
 }
 
 sub _move_uv {
@@ -158,19 +180,19 @@ sub _move_uv {
 sub move_player {
     my ($self, $move) = @_;
 
-    my ($u,$v) = $self->cur_player->pos;
+    my $loc = $self->player->loc;
+    my ($u,$v) = @$loc;
     my ($d_u,$d_v) = _move_uv($move);
-    my $new_u = $u + $d_u;
-    my $new_v = $v + $d_v;
+    my ($new_u,$new_v) = ($u+$d_u, $v+$d_v);
 
     if ($new_u < 0 || $new_u > 8 || $new_v < 0 || $new_v > 8) {
         die "cannot move $move; edge of board";
     }
 
-    my $wall_ul = $self->{walls}[$v  ][$u  ];
-    my $wall_ur = $self->{walls}[$v  ][$u+1];
-    my $wall_dl = $self->{walls}[$v+1][$u  ];
-    my $wall_dr = $self->{walls}[$v+1][$u+1];
+    my $wall_ul = $self->_wall_dir($u  ,$v  );
+    my $wall_ur = $self->_wall_dir($u+1,$v  );
+    my $wall_dl = $self->_wall_dir($u  ,$v+1);
+    my $wall_dr = $self->_wall_dir($u+1,$v+1);
 
     if (
         ($d_v < 0 && ($wall_ul eq 'row' || $wall_ur eq 'row')) ||
@@ -181,7 +203,7 @@ sub move_player {
         die "cannot move $move; wall";
     }
 
-    $self->cur_player->pos($new_u,$new_v);
+    $self->player->loc([$new_u,$new_v]);
 }
 
 sub _dump_walls {
@@ -195,42 +217,49 @@ sub _dump_walls {
 }
 
 package Quoridor::Player;
-use warnings;
-use strict;
+use Moose;
+use MooseX::AttributeHelpers;
 
-use Class::Field qw/field/;
+has name => (is => 'ro', isa => 'Str');
+has symbol => (
+    is => 'ro', isa => 'Str',
+    default => sub { substr $_[0]->name,0,1 },
+);
+has walls_remaining => (
+    metaclass => 'Counter',
+    is => 'ro',
+    isa => 'Int',
+    default => sub { 10 },
+    provides => {
+        dec => 'dec_walls'
+    },
+);
+has loc => (
+    is => 'rw',
+    isa => 'ArrayRef[Int]',
+    default => sub { [0,0] },
+);
 
-field 'label';
-field 'walls' => 10;
+package Quoridor::Wall;
+use Moose;
+use Moose::Util::TypeConstraints;
 
-use constant U => 0;
-use constant V => 1;
-
-sub new {
-    my $class = shift;
-    my $label = shift;
-
-    my $self = bless {}, $class;
-
-    $self->label($label);
-    $self->{pos} = [];
-    return $self;
-}
-
-sub pos {
-    my $self = shift;
-    if (@_) {
-        if (ref($_[0]) eq 'ARRAY') {
-            my $pos = shift;
-            $self->{pos} = [@$pos[U,V]];
-        }
-        else {
-            $self->{pos} = [@_[U,V]];
-        }
-    }
-
-    return @{$self->{pos}};
-}
+has loc => (
+    is => 'ro',
+    isa => 'ArrayRef[Int]',
+    required => 1,
+);
+enum 'Quoridor::WallDirection' => qw(row col);
+has dir => (
+    is => 'ro',
+    isa => 'Quoridor::WallDirection',
+    required => 1,
+);
+has placed_by => (
+    is => 'ro',
+    isa => 'Quoridor::Player',
+    weak_ref => 1,
+);
 
 1;
 # vim: ft=perl,sts=4,sw=4,et
