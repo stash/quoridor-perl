@@ -1,5 +1,5 @@
 #!perl
-use Test::More tests => 116;
+use Test::More tests => 120;
 use Test::Exception;
 use warnings FATAL => 'all';
 use strict;
@@ -118,19 +118,22 @@ overlapping: {
         isa_ok $q->wall(3,3), 'Quoridor::Wall';
         is $q->wall(3,3)->dir, 'row';
 
-        eval { $q->place_wall(row => 2,3) };
-        like $@, qr/wall overlaps/;
-        eval { $q->place_wall(row => 4,3) };
-        like $@, qr/wall overlaps/;
+        throws_ok { $q->place_wall(row => 2,3) } qr/wall overlaps/;
+        throws_ok { $q->place_wall(row => 4,3) } qr/wall overlaps/;
 
         $q->place_wall(col => 5,5);
         isa_ok $q->wall(5,5), 'Quoridor::Wall';
         is $q->wall(5,5)->dir, 'col';
 
-        eval { $q->place_wall(col => 5,4) };
-        like $@, qr/wall overlaps/;
-        eval { $q->place_wall(col => 5,6) };
-        like $@, qr/wall overlaps/;
+        throws_ok { $q->place_wall(col => 5,4) } qr/wall overlaps/;
+        throws_ok { $q->place_wall(col => 5,6) } qr/wall overlaps/;
+    }
+
+    tee: {
+        lives_ok {$q->place_wall(col => 1,8)};
+        lives_ok {$q->place_wall(row => 2,8)};
+        lives_ok {$q->place_wall(col => 4,8)};
+        lives_ok {$q->place_wall(row => 6,8)};
     }
 }
 

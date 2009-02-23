@@ -159,14 +159,14 @@ sub place_wall {
     croak "already a ".$wall->dir." wall at ($x,$y)\n" if $wall;
 
     if ($dir eq 'row') {
-        my $left  = $self->_wall($x-1,$y);
-        my $right = $self->_wall($x+1,$y);
-        croak "wall overlaps" if ($left or $right);
+        my $left  = $self->_wall_dir($x-1,$y);
+        my $right = $self->_wall_dir($x+1,$y);
+        croak "row wall overlaps" if ($left eq 'row' or $right eq 'row');
     }
     else {
-        my $up   = $self->_wall($x,$y-1);
-        my $down = $self->_wall($x,$y+1);
-        croak "wall overlaps" if ($up or $down);
+        my $up   = $self->_wall_dir($x,$y-1);
+        my $down = $self->_wall_dir($x,$y+1);
+        croak "col wall overlaps" if ($up eq 'col' or $down eq 'col');
     }
 
     $wall = Quoridor::Wall->new(
