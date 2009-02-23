@@ -59,7 +59,7 @@ has players => (
 
 has walls => (
     is => 'ro', lazy => 1, init_arg => undef,
-    isa => 'ArrayRef[ArrayRef[Undef|Quoridor::Wall]]', # 2D array of Walls
+    isa => 'ArrayRef[ArrayRef[Maybe[Quoridor::Wall]]]', # 2D array of Walls
     builder => '_build_walls'
 );
 
