@@ -249,10 +249,10 @@ has loc => (
     isa => 'ArrayRef[Int]',
     required => 1,
 );
-enum 'Quoridor::WallDirection' => qw(row col);
+enum 'Quoridor.direction' => qw(row col);
 has dir => (
     is => 'ro',
-    isa => 'Quoridor::WallDirection',
+    isa => 'Quoridor.direction',
     required => 1,
 );
 has placed_by => (
