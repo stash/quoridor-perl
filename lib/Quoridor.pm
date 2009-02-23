@@ -1,6 +1,7 @@
 package Quoridor;
 use Moose;
 use Moose::Util::TypeConstraints;
+use MooseX::AttributeHelpers;
 
 =head2 Coordinates
 
@@ -73,7 +74,18 @@ has players => (
 has walls => (
     is => 'ro', lazy => 1, init_arg => undef,
     isa => 'ArrayRef[ArrayRef[Maybe[Quoridor::Wall]]]', # 2D array of Walls
-    builder => '_build_walls'
+    builder => '_build_walls',
+);
+
+has wall_list => (
+    metaclass => 'Collection::Array',
+    is => 'rw', isa => 'ArrayRef[Quoridor::Wall]', default => sub { [] },
+    provides => {
+        first => 'first_wall',
+        last => 'last_wall',
+        count => 'wall_count',
+        push => '_add_wall',
+    }
 );
 
 sub _build_players {
@@ -169,6 +181,7 @@ sub place_wall {
     }
 
     $self->walls->[$y][$x] = $wall;
+    $self->_add_wall($wall);
     return $wall;
 }
 

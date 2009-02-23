@@ -1,5 +1,5 @@
 #!perl
-use Test::More tests => 103;
+use Test::More tests => 116;
 use Test::Exception;
 use warnings FATAL => 'all';
 use strict;
@@ -263,6 +263,31 @@ walls_block_movement: {
     eval { $q->move_player('right') };
     like $@, qr/cannot move right; wall/;
     is_player_at($q => 3,4);
+}
+
+walls_in_a_list: {
+    my $q = Quoridor->new();
+    is_deeply $q->wall_list, [];
+
+    my $w1 = $q->place_wall(row => 4,4);
+    isa_ok $w1, 'Quoridor::Wall';
+    is $w1->placed_by->symbol, 'A';
+    $q->next_player();
+
+    is_deeply $q->wall_list, [$w1];
+    is $q->first_wall, $w1;
+    is $q->last_wall, $w1;
+    is $q->wall_count, 1;
+
+    my $w2 = $q->place_wall(row => 5,5);
+    isa_ok $w2, 'Quoridor::Wall';
+    is $w2->placed_by->symbol, 'B';
+    $q->next_player();
+
+    is_deeply $q->wall_list, [$w1,$w2];
+    is $q->first_wall, $w1;
+    is $q->last_wall, $w2;
+    is $q->wall_count, 2;
 }
 
 # TODO: illegal to cut off player from destination
