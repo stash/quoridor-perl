@@ -1,5 +1,6 @@
 package Quoridor;
 use Moose;
+use Moose::Util::TypeConstraints;
 
 =head2 Coordinates
 
@@ -50,6 +51,18 @@ our %Starting_Coords = (
     B => [4,8],
 );
 our $UNLIMITED_WALLS = 0;
+
+subtype 'NaturalInt'
+    => as 'Int'
+    => where { $_ >= 0 }
+    => message { "The number you provided, $_, was not a natural number" }
+    ;
+
+subtype 'Quoridor.point'
+    => as 'ArrayRef[NaturalInt]'
+    => where { @$_ == 2 }
+    => message { "The array you provided was not a pair" }
+    ;
 
 has players => (
     is => 'ro', lazy => 1, init_arg => undef,
@@ -228,7 +241,7 @@ has symbol => (
 has walls_remaining => (
     metaclass => 'Counter',
     is => 'ro',
-    isa => 'Int',
+    isa => 'NaturalInt',
     default => sub { 10 },
     provides => {
         dec => 'dec_walls'
@@ -236,7 +249,7 @@ has walls_remaining => (
 );
 has loc => (
     is => 'rw',
-    isa => 'ArrayRef[Int]',
+    isa => 'Quoridor.point',
     default => sub { [0,0] },
 );
 
@@ -246,7 +259,7 @@ use Moose::Util::TypeConstraints;
 
 has loc => (
     is => 'ro',
-    isa => 'ArrayRef[Int]',
+    isa => 'Quoridor.point',
     required => 1,
 );
 enum 'Quoridor.direction' => qw(row col);
