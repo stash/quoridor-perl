@@ -139,7 +139,7 @@ sub Grid {
     my $max = shift || MAX_UV;
     my @grid;
     for my $v (0 .. $max) {
-        $grid[$v] = [(0) x $max+1];
+        $grid[$v] = [(0) x ($max+1)];
     }
     return \@grid;
 }
@@ -209,7 +209,7 @@ sub place_wall {
     $self->walls->[$y][$x] = $wall;
     unless ($self->can_all_players_reach_goal) {
         $self->walls->[$y][$x] = undef;
-        croak "cannot cut off player with a wall";
+        croak "cannot cut off player with a wall ($dir => $x,$y)";
     }
 
     $self->player->dec_walls
@@ -240,19 +240,21 @@ sub can_player_reach_goal {
         my $loc = pop @dfs_stack;
         my ($u,$v) = @$loc;
         next if ($visited->[$v][$u]);
+        $visited->[$v][$u] = 1;
 
         if ($goal_grid->[$v][$u]) {
             #Test::More::diag $player->name . " is ok, loops: $loops\n";
+            #_dump_grid($visited);
             return 1;
         }
 
-        $visited->[$v][$u] = 1;
         for my $move (@dfs_heuristic) {
             my $result = $self->_check_invalid_move($loc, $move);
             push @dfs_stack, $result if ref($result);
         }
     }
     #Test::More::diag $player->name . " is cut-off, loops: $loops\n";
+    #_dump_grid($visited);
     
     return 0;
 }
@@ -322,6 +324,15 @@ sub _dump_walls {
         }
         print "\n";
     }
+}
+
+sub _dump_grid {
+    my $grid = shift;
+    Test::More::diag "[\n";
+    for my $v (0 .. MAX_UV) {
+        Test::More::diag "\t".join('',@{$grid->[$v]})."\n";
+    }
+    Test::More::diag "]\n";
 }
 
 package Quoridor::Player;
