@@ -314,6 +314,30 @@ sub move_player {
     my $result = $self->_check_invalid_move($loc, $move);
     croak $result unless ref $result;
     $self->player->loc($result);
+
+    my @other_players = grep { $_ != $self->player } @{$self->players};
+    if (grep {$_->loc->[U] == $result->[U] && 
+              $_->loc->[V] == $result->[V]    } @other_players)
+    {
+        # Jumping:
+        # Move in a straight line unless blocked by wall or edge.
+        # If blocked, move again.
+        #
+        # Rules are ambiguous as to how the edge of the board behaves (is
+        # jumping over a pawn towards an edge an illegal move?).
+        #
+        # TODO: jumps are blocked by pawns in addition to walls and edges
+        # when more than 2 players are playing.
+        # Refactor to return legal moves, error if no legal moves (dead-end).
+        my $jump = $self->_check_invalid_move($self->player->loc, $move);
+        if (ref $jump) {
+            $self->player->loc($jump);
+        }
+        else {
+            return 'move again';
+        }
+    }
+    return;
 }
 
 sub _dump_walls {

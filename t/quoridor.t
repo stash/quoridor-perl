@@ -1,5 +1,5 @@
 #!perl
-use Test::More tests => 120;
+use Test::More tests => 127;
 use Test::Exception;
 use warnings FATAL => 'all';
 use strict;
@@ -293,9 +293,47 @@ walls_in_a_list: {
     is $q->wall_count, 2;
 }
 
-# TODO: illegal to cut off player from destination
-# TODO: jumping pawns
-# TODO: jumping pawns, but blocked by wall
+jumping: {
+    my $q = Quoridor->new();
+    ok $q;
+
+    middle_of_board: {
+        $q->_place_player(4,5);
+        $q->next_player;
+        $q->_place_player(5,5);
+
+        my $again = $q->move_player('left');
+        ok !$again, "jump should be in a line";
+        is_player_at($q => 3,5);
+    }
+
+    edge_of_board: {
+        $q->_place_player(8,5);
+        $q->next_player;
+        $q->_place_player(7,5);
+
+        my $again = $q->move_player('right');
+        is $again, "move again", "players occupy same square";
+        is_player_at($q => 8,5);
+    }
+
+    blocked_by_wall: {
+        $q->_place_player(4,5);
+        $q->place_wall(col => 4,5);
+        $q->next_player;
+        $q->_place_player(5,5);
+
+        my $again = $q->move_player('left');
+        ok $again, "wall blocks linear jump";
+        is_player_at($q => 4,5);
+    }
+
+    # 3-4 Players TODO:
+    # jumping is blocked by a second pawn; must move again, but *not* to that
+    # second pawn.  Jumps cannot be chained.  move_player returns a list of
+    # legal follow-up moves.  As a result of that change, jumping into a
+    # dead-end becomes illegal.
+}
 
 ok 1, 'done';
 
