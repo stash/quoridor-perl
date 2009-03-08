@@ -62,6 +62,9 @@ subtype 'Quoridor.point'
     => message { "The array you provided was not a pair" }
     ;
 
+enum 'Quoridor.direction' => qw(row col);
+enum 'Quoridor.move' => qw(up left down right);
+
 has players => (
     is => 'ro', lazy => 1, init_arg => undef,
     isa => 'ArrayRef[Quoridor::Player]',
@@ -97,6 +100,13 @@ sub _build_players {
         A => [ map { [$_,MAX_UV] } (0..MAX_UV) ],
         B => [ map { [$_,0]      } (0..MAX_UV) ],
     );
+    # heuristic for making the 'can reach goal' case quicker when there's no
+    # blocking walls.  Not strictly needed, but speeds things up a little in
+    # general.
+    my %DFS_Heuristic = (
+        A => [reverse qw(down right left up)],
+        B => [reverse qw(up left right down)],
+    );
 
     my @symbols = sort keys %Starting_Coords;
     foreach my $symbol (@symbols) {
@@ -108,6 +118,7 @@ sub _build_players {
             walls => 10,
             loc => $Starting_Coords{$symbol},
             goals => $Goal_Coords{$symbol},
+            dfs_heuristic => $DFS_Heuristic{$symbol},
         );
         push @players, $player;
     }
@@ -220,12 +231,13 @@ sub can_player_reach_goal {
     my $player = shift;
     my $visited = $self->Grid();
     my $goal_grid = $player->goal_grid;
+    my @dfs_heuristic = @{$player->dfs_heuristic};
 
-    my @bfs_queue = ($player->loc);
+    my @dfs_stack = ($player->loc);
     my $loops = 0;
-    while (@bfs_queue) {
+    while (@dfs_stack) {
         $loops ++;
-        my $loc = shift @bfs_queue;
+        my $loc = pop @dfs_stack;
         my ($u,$v) = @$loc;
         next if ($visited->[$v][$u]);
 
@@ -235,9 +247,9 @@ sub can_player_reach_goal {
         }
 
         $visited->[$v][$u] = 1;
-        for my $move (qw(up left down right)) {
+        for my $move (@dfs_heuristic) {
             my $result = $self->_check_invalid_move($loc, $move);
-            push @bfs_queue, $result if ref($result);
+            push @dfs_stack, $result if ref($result);
         }
     }
     #Test::More::diag $player->name . " is cut-off, loops: $loops\n";
@@ -347,6 +359,11 @@ has goal_grid => (
     lazy => 1,
     builder => '_build_goal_grid',
 );
+has dfs_heuristic => (
+    is => 'ro',
+    isa => 'ArrayRef[Quoridor.move]',
+    required => 1,
+);
 
 sub _build_goal_grid {
     my $self = shift;
@@ -367,7 +384,6 @@ has loc => (
     isa => 'Quoridor.point',
     required => 1,
 );
-enum 'Quoridor.direction' => qw(row col);
 has dir => (
     is => 'ro',
     isa => 'Quoridor.direction',
