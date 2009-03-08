@@ -48,10 +48,6 @@ use constant NUM_UV => 9;
 use constant MAX_XY => 9;
 use constant NUM_XY => 10;
 
-our %Starting_Coords = (
-    A => [4,0],
-    B => [4,8],
-);
 our $UNLIMITED_WALLS = 0;
 
 subtype 'NaturalInt'
@@ -93,14 +89,25 @@ sub _build_players {
     my $self = shift;
     my @players;
 
+    my %Starting_Coords = (
+        A => [4,0],
+        B => [4,MAX_UV],
+    );
+    my %Goal_Coords = (
+        A => [ map { [$_,MAX_UV] } (0..MAX_UV) ],
+        B => [ map { [$_,0]      } (0..MAX_UV) ],
+    );
+
     my @symbols = sort keys %Starting_Coords;
     foreach my $symbol (@symbols) {
         my $coords = $Starting_Coords{$symbol};
+        my $goals = $Goal_Coords{$symbol};
         my $player = Quoridor::Player->new(
             name => "Player $symbol",
             symbol => $symbol,
             walls => 10,
-            loc => [@$coords],
+            loc => $Starting_Coords{$symbol},
+            goals => $Goal_Coords{$symbol},
         );
         push @players, $player;
     }
@@ -114,6 +121,16 @@ sub _build_walls {
         $walls[$y] = [(undef) x NUM_XY];
     }
     return \@walls;
+}
+
+sub Grid {
+    my $class = shift;
+    my $max = shift || MAX_UV;
+    my @grid;
+    for my $v (0 .. $max) {
+        $grid[$v] = [(0) x $max+1];
+    }
+    return \@grid;
 }
 
 sub player { return $_[0]->players->[0]; }
@@ -175,15 +192,57 @@ sub place_wall {
         placed_by => $self->player,
     );
 
-    unless ($UNLIMITED_WALLS) {
-        my $cur = $self->player->walls_remaining;
-        croak "no more walls" unless $cur;
-        $self->player->dec_walls;
-    }
+    croak "no more walls"
+        unless $self->player->walls_remaining;
 
     $self->walls->[$y][$x] = $wall;
+    unless ($self->can_all_players_reach_goal) {
+        $self->walls->[$y][$x] = undef;
+        croak "cannot cut off player with a wall";
+    }
+
+    $self->player->dec_walls
+        unless $UNLIMITED_WALLS;
     $self->_add_wall($wall);
     return $wall;
+}
+
+sub can_all_players_reach_goal {
+    my $self = shift;
+    foreach my $player (@{$self->players}) {
+        return 0 unless $self->can_player_reach_goal($player);
+    }
+    return 1;
+}
+
+sub can_player_reach_goal {
+    my $self = shift;
+    my $player = shift;
+    my $visited = $self->Grid();
+    my $goal_grid = $player->goal_grid;
+
+    my @bfs_queue = ($player->loc);
+    my $loops = 0;
+    while (@bfs_queue) {
+        $loops ++;
+        my $loc = shift @bfs_queue;
+        my ($u,$v) = @$loc;
+        next if ($visited->[$v][$u]);
+
+        if ($goal_grid->[$v][$u]) {
+            #Test::More::diag $player->name . " is ok, loops: $loops\n";
+            return 1;
+        }
+
+        $visited->[$v][$u] = 1;
+        for my $move (qw(up left down right)) {
+            my $result = $self->_check_invalid_move($loc, $move);
+            push @bfs_queue, $result if ref($result);
+        }
+    }
+    #Test::More::diag $player->name . " is cut-off, loops: $loops\n";
+    
+    return 0;
 }
 
 sub _place_player {
@@ -204,16 +263,17 @@ sub _move_uv {
     return ($d_u,$d_v);
 }
 
-sub move_player {
-    my ($self, $move) = @_;
+sub _check_invalid_move {
+    my $self = shift;
+    my $loc = shift;
+    my $move = shift;
 
-    my $loc = $self->player->loc;
     my ($u,$v) = @$loc;
     my ($d_u,$d_v) = _move_uv($move);
     my ($new_u,$new_v) = ($u+$d_u, $v+$d_v);
 
     if ($new_u < 0 || $new_u > 8 || $new_v < 0 || $new_v > 8) {
-        croak "cannot move $move; edge of board";
+        return "cannot move $move; edge of board";
     }
 
     my $wall_ul = $self->_wall_dir($u  ,$v  );
@@ -227,10 +287,19 @@ sub move_player {
         ($d_u < 0 && ($wall_ul eq 'col' || $wall_dl eq 'col')) ||
         ($d_u > 0 && ($wall_ur eq 'col' || $wall_dr eq 'col'))
     ) {
-        croak "cannot move $move; wall";
+        return "cannot move $move; wall";
     }
 
-    $self->player->loc([$new_u,$new_v]);
+    return [$new_u,$new_v];
+}
+
+sub move_player {
+    my ($self, $move) = @_;
+
+    my $loc = $self->player->loc;
+    my $result = $self->_check_invalid_move($loc, $move);
+    croak $result unless ref $result;
+    $self->player->loc($result);
 }
 
 sub _dump_walls {
@@ -258,7 +327,7 @@ has walls_remaining => (
     isa => 'NaturalInt',
     default => sub { 10 },
     provides => {
-        dec => 'dec_walls'
+        dec => 'dec_walls',
     },
 );
 has loc => (
@@ -266,6 +335,28 @@ has loc => (
     isa => 'Quoridor.point',
     default => sub { [0,0] },
 );
+has goals => (
+    is => 'ro',
+    isa => 'ArrayRef[Quoridor.point]',
+    required => 1,
+);
+has goal_grid => (
+    is => 'ro',
+    isa => 'ArrayRef[ArrayRef[Bool]]',
+    init_arg => undef,
+    lazy => 1,
+    builder => '_build_goal_grid',
+);
+
+sub _build_goal_grid {
+    my $self = shift;
+    my $grid = Quoridor->Grid();
+    for my $goal (@{$self->goals}) {
+        my ($u,$v) = @$goal;
+        $grid->[$v][$u] = 1;
+    }
+    return $grid;
+}
 
 package Quoridor::Wall;
 use Moose;
