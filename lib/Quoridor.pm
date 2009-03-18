@@ -66,20 +66,24 @@ enum 'Quoridor.direction' => qw(row col);
 enum 'Quoridor.move' => qw(up left down right);
 
 has players => (
-    is => 'ro', lazy => 1, init_arg => undef,
-    isa => 'ArrayRef[Quoridor::Player]',
-    builder => '_build_players',
+    is => 'ro', isa => 'ArrayRef[Quoridor::Player]',
+    metaclass => 'Collection::Array',
+    lazy_build => 1, init_arg => undef,
+    provides => {
+        first => 'player',
+    },
 );
 
 has walls => (
-    is => 'ro', lazy => 1, init_arg => undef,
+    is => 'ro', 
     isa => 'ArrayRef[ArrayRef[Maybe[Quoridor::Wall]]]', # 2D array of Walls
-    builder => '_build_walls',
+    lazy_build => 1, init_arg => undef,
 );
 
 has wall_list => (
+    is => 'rw', isa => 'ArrayRef[Quoridor::Wall]',
     metaclass => 'Collection::Array',
-    is => 'rw', isa => 'ArrayRef[Quoridor::Wall]', default => sub { [] },
+    default => sub { [] },
     provides => {
         first => 'first_wall',
         last => 'last_wall',
@@ -143,8 +147,6 @@ sub Grid {
     }
     return \@grid;
 }
-
-sub player { return $_[0]->players->[0]; }
 
 sub next_player {
     my $self = shift;
