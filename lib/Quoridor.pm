@@ -48,6 +48,8 @@ use constant NUM_UV => 9;
 use constant MAX_XY => 9;
 use constant NUM_XY => 10;
 
+use namespace::clean -except => 'meta';
+
 our $UNLIMITED_WALLS = 0;
 
 subtype 'NaturalInt'
@@ -361,9 +363,12 @@ sub _dump_grid {
     Test::More::diag "]\n";
 }
 
+__PACKAGE__->meta->make_immutable;
+
 package Quoridor::Player;
 use Moose;
 use MooseX::AttributeHelpers;
+use namespace::clean -except => 'meta';
 
 has name => (is => 'ro', isa => 'Str');
 has symbol => (
@@ -412,9 +417,11 @@ sub _build_goal_grid {
     return $grid;
 }
 
+__PACKAGE__->meta->make_immutable;
+
 package Quoridor::Wall;
 use Moose;
-use Moose::Util::TypeConstraints;
+use namespace::clean -except => 'meta';
 
 has loc => (
     is => 'ro',
@@ -432,5 +439,6 @@ has placed_by => (
     weak_ref => 1,
 );
 
+__PACKAGE__->meta->make_immutable;
 1;
 # vim: ft=perl,sts=4,sw=4,et
