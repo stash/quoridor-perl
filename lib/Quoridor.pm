@@ -133,11 +133,7 @@ sub _build_players {
 }
 
 sub _build_walls {
-    my @walls;
-    for my $y (0 .. MAX_XY) {
-        $walls[$y] = [(undef) x NUM_XY];
-    }
-    return \@walls;
+    return $_[0]->Grid(MAX_XY);
 }
 
 sub Grid {
@@ -145,7 +141,7 @@ sub Grid {
     my $max = shift || MAX_UV;
     my @grid;
     for my $v (0 .. $max) {
-        $grid[$v] = [(0) x ($max+1)];
+        $grid[$v] = [(undef) x ($max+1)];
     }
     return \@grid;
 }
@@ -356,11 +352,14 @@ sub _dump_walls {
 
 sub _dump_grid {
     my $grid = shift;
-    Test::More::diag "[\n";
-    for my $v (0 .. MAX_UV) {
-        Test::More::diag "\t".join('',@{$grid->[$v]})."\n";
+    my $max = shift || MAX_UV;
+    my $dump = "[\n";
+    for my $v (0 .. $max) {
+        my @row = map { defined $_ ? $_ : '?' } @{$grid->[$v]};
+        $dump .= "\t".join('',@row)."\n";
     }
-    Test::More::diag "]\n";
+    $dump .= "]\n";
+    warn $dump;
 }
 
 __PACKAGE__->meta->make_immutable;
